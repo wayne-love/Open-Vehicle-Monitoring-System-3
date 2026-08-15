@@ -35,6 +35,7 @@ static const char *TAG = "v-nissanleaf";
 #include <stdio.h>
 #include <string.h>
 #include "pcp.h"
+#include "vehicle_common.h"
 #include "vehicle_nissanleaf.h"
 #include "ovms_events.h"
 #include "ovms_metrics.h"
@@ -67,15 +68,16 @@ enum poll_states
   POLLSTATE_CHARGING  //- car is charging
   };
 
-// Leaf does not respond to polls when car is off
-// So there is no point polling when car is off
-
+// BUS2 is off on the ZE1 when car is off or Charging, CAN is active if ignition
+// is in Accessories, On or Running. But we dont map all those states here.
+// We can "Wakeup" BUS2 but this seems to put a heavy load on the 12v battery
+// Should only do this if we are charging.
 static const OvmsPoller::poll_pid_t obdii_polls_ze1[] =
   {
-    // BUS 2                                                                         Off,   On, Run, Charge 
-    { CHARGER_TXID, CHARGER_RXID, VEHICLE_POLL_TYPE_OBDIIGROUP, VIN_PID,            {  0, 3600,   0,      0 }, 2, ISOTP_STD }, // VIN [19] Never changes
-    { CHARGER_TXID, CHARGER_RXID, VEHICLE_POLL_TYPE_OBDIIEXTENDED, QC_COUNT_PID,    {  0,    0,   0,   3600 }, 2, ISOTP_STD }, // QC [2] Only changes when charging. Do not update when car is active to reduce traffic.
-    { CHARGER_TXID, CHARGER_RXID, VEHICLE_POLL_TYPE_OBDIIEXTENDED, L1L2_COUNT_PID,  {  0,    0,   0,   3600 }, 2, ISOTP_STD }, // L0/L1/L2 [2] Only changes when charging. Do not update when car is active to reduce traffic.
+    // BUS 2                                                                         Off,   On,  Run, Charge 
+    { CHARGER_TXID, CHARGER_RXID, VEHICLE_POLL_TYPE_OBDIIGROUP, VIN_PID,            {  0, 3600, 3600,      0 }, 2, ISOTP_STD }, // VIN [19] Never changes
+    { CHARGER_TXID, CHARGER_RXID, VEHICLE_POLL_TYPE_OBDIIEXTENDED, QC_COUNT_PID,    {  0, 3600, 3600,      0 }, 2, ISOTP_STD }, // QC [2] Only changes when charging.
+    { CHARGER_TXID, CHARGER_RXID, VEHICLE_POLL_TYPE_OBDIIEXTENDED, L1L2_COUNT_PID,  {  0, 3600, 3600,      0 }, 2, ISOTP_STD }, // L0/L1/L2 [2] Only changes when charging.
     // BUS 1
     { BMS_TXID, BMS_RXID, VEHICLE_POLL_TYPE_OBDIIGROUP, 0x01, {  0, 60, 60, 60 }, 1, ISOTP_STD },   // bat [39/41]
     { BMS_TXID, BMS_RXID, VEHICLE_POLL_TYPE_OBDIIGROUP, 0x02, {  0, 60, 60, 60 }, 1, ISOTP_STD },   // battery voltages [196]
@@ -2158,6 +2160,8 @@ void OvmsVehicleNissanLeaf::Ticker10(uint32_t ticker)
     StandardMetrics.ms_v_env_charging12v->SetValue(true);
     }
   else StandardMetrics.ms_v_env_charging12v->SetValue(false);
+
+  StandardMetrics.ms_v_env_charging12v->SetStale(false);
   // FIXME
   // detecting that on is stale and therefor should turn off probably shouldn't
   // be done like this

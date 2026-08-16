@@ -180,6 +180,7 @@ class OvmsVehicleNissanLeaf : public OvmsVehicle
     void PollReply_Battery(const uint8_t *reply_data, uint16_t reply_len);
     void PollReply_QC(const uint8_t *reply_data, uint16_t reply_len);
     void PollReply_L0L1L2(const uint8_t *reply_data, uint16_t reply_len);
+    void PollReply_12VCurrent(const uint8_t *reply_data, uint16_t reply_len);
     void PollReply_VIN(const uint8_t *reply_data, uint16_t reply_len);
     void PollReply_BMS_Volt(const uint8_t *reply_data, uint16_t reply_len);
     void PollReply_BMS_Shunt(const uint8_t *reply_data, uint16_t reply_len);

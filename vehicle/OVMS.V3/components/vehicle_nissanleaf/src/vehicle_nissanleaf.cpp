@@ -1747,11 +1747,11 @@ void OvmsVehicleNissanLeaf::IncomingFrameCan1(CAN_frame_t* p_frame)
         {
         /* Battery type 1 and 2 use different (* and conficting)
          * mx values to identify the charge duration type:
-         *         |    |  full 100% 	    | range 80%  	|
+         *         |    |  full 100% 	      | range 80%  	|
          *   type  | QC | 6.6kW  200V  100V | 6.6kW  200V  100V |
          *  ------ | -- |  --    --    --   |  --    --    --   |
          *   ZE0 1 |  0 |  NA    9     17   |  NA    10    18*	|
-         *  AZE0 2 |  0 |  5	 8     11   |  18*   21    24	|
+         *  AZE0 2 |  0 |  5	   8     11   |  18*   21    24	  |
          *
          * Only type 1 and type 2 24kwh models from before 2016 will report a valid 'range 80%'.
          * Any type 2 24 or 30kwh models starting mid 2015 (USA/Jap) or 2016 (UK), will always
@@ -2240,24 +2240,25 @@ void OvmsVehicleNissanLeaf::Ticker10(uint32_t ticker)
         }
       }
     }
-    else
+
+  // If 12V voltage is above 12.8V, then the car is charging the 12V battery.
+  // Using 12V current is no ideal as the battery can be discharging under heavy
+  // load but the 12V charger may still be active.  
+  if (StandardMetrics.ms_v_bat_12v_voltage->AsFloat() > 12.8)
     {
-      if (StandardMetrics.ms_v_bat_12v_voltage->AsFloat() > 12.8)
-      {
-      StandardMetrics.ms_v_env_charging12v->SetValue(true);
-      }
-    else StandardMetrics.ms_v_env_charging12v->SetValue(false);
-
-    StandardMetrics.ms_v_env_charging12v->SetStale(false);
-    // FIXME
-    // detecting that on is stale and therefor should turn off probably shouldn't
-    // be done like this
-    // perhaps there should be a car on-off state tracker and event generator in
-    // the core framework?
-    // perhaps interested code should be able to subscribe to "onChange" and
-    // "onStale" events for each metric?
+    StandardMetrics.ms_v_env_charging12v->SetValue(true);
     }
+  else StandardMetrics.ms_v_env_charging12v->SetValue(false);
 
+  StandardMetrics.ms_v_env_charging12v->SetStale(false);
+  // FIXME
+  // detecting that on is stale and therefor should turn off probably shouldn't
+  // be done like this
+  // perhaps there should be a car on-off state tracker and event generator in
+  // the core framework?
+  // perhaps interested code should be able to subscribe to "onChange" and
+  // "onStale" events for each metric?
+  
   ESP_LOGD(TAG, "Poll state: %d", m_poll_state);
   if (StandardMetrics.ms_v_env_awake->AsBool() && StandardMetrics.ms_v_env_awake->IsStale())
     {

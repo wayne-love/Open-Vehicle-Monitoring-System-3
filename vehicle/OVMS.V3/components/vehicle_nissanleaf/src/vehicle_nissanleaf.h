@@ -265,10 +265,12 @@ class OvmsVehicleNissanLeaf : public OvmsVehicle
     float       m_cum_energy_recd_wh;                   // Cumulated energy (in wh) recovered  within 1 second ticker interval
     float       m_cum_energy_charge_wh;                 // Cumulated energy (in wh) charged within 10 second ticker interval
     float       m_cum_energy_gen_wh;                    // Cumulated energy (in wh) exported within 10 second ticker interval
-    bool        m_ZE0_charger;                          // True if 2011-2012 ZE0 LEAF with 0x380 message (Gen 1)
-    bool        m_AZE0_charger;                         // True if 2013+ AZE0 LEAF with 0x390 message (Gen 2)
-    bool        m_climate_really_off;                   // Needed for AZE0 to shown correct hvac status while charging
-    bool        m_kWh_capacity_read;                    // m_battery_energy_capacity Ah*V fallback inhibitor
+    bool        m_ZE0_charger = false;                  // True if 2011-2012 ZE0 LEAF with 0x380 message (Gen 1)
+    bool        m_AZE0_charger = false;                 // True if 2013+ AZE0, NV200, ZE1 LEAF with 0x390 message (Gen 2)
+    bool        m_climate_really_off = false;           // Needed for AZE0 to shown correct hvac status while charging
+    bool        m_kWh_capacity_read = false;            // m_battery_energy_capacity Ah*V fallback inhibitor
+
+    Model m_model = MODEL_UNKNOWN;                      // Model of the vehicle
 
     OvmsPoller::poll_pid_t* obdii_polls;
 

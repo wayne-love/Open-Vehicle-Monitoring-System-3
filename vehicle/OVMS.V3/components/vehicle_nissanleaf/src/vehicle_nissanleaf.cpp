@@ -221,11 +221,6 @@ OvmsVehicleNissanLeaf::OvmsVehicleNissanLeaf()
   MyMetrics.InitString("v.c.state",SM_STALE_MID,"stopped");
   
   StandardMetrics.ms_v_bat_12v_current->SetAutoStale(30);
-  
-  m_ZE0_charger = false;
-  m_kWh_capacity_read = false;
-  m_AZE0_charger = false;
-  m_climate_really_off = false;
 
   cfg_soh_newcar = MyConfig.GetParamValueBool("xnl", "soh.newcar", false);
 

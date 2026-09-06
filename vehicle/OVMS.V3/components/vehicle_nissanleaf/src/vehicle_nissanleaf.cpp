@@ -124,23 +124,17 @@ void ccDisableTimer(TimerHandle_t timer)
   nl->CcDisableTimer();
   }
 
-
-
-
-
-// This seems to be used as a proxy for the model of the vehicle.  It could be that
-// this logic could be removed and we could standardise on just using a standardised model enum.
 // The published battery types are...
 // ZE0 - 24kWh (3 variants 2011-12, 2013-14, 2015)
 // AZE0 - 24kWh (2 variants 2013-15, 2015), 30kWh
 // ZE1 - 40kWh, 62kWh
+// We only care about the ZE0 and AZE0 as they report charge times
+// different based on the battery type. The ZE1 just uses type 2 batteries
 enum battery_type
   {
-  BATTERY_TYPE_1_24kWh,
-  BATTERY_TYPE_2_24kWh,
-  BATTERY_TYPE_2_30kWh,
-  BATTERY_TYPE_2_40kWh,
-  BATTERY_TYPE_2_62kWh
+  BATTERY_TYPE_UNKNOWN,
+  BATTERY_TYPE_1,
+  BATTERY_TYPE_2
   };
 
 enum charge_duration_index
@@ -1680,10 +1674,11 @@ void OvmsVehicleNissanLeaf::IncomingFrameCan1(CAN_frame_t* p_frame)
           break;
         }
 
-
-      // ZE0 SOH
-      if (!cfg_ze1) {
-        if (m_battery_type->AsInt(0) == BATTERY_TYPE_1_24kWh) {
+      // This is valid for all batteries by there is better accuracy for ZE1 by polling the battery management system directly.  
+      if (!cfg_ze1) 
+      {
+        // This was only tagged on Battery Type 1 (24kWh) but it is also valid for Type 2 (30kWh, 40kWh, 62kWh)
+        //if (m_battery_type->AsInt(0) == BATTERY_TYPE_1_24kWh) {
           uint8_t soh = (d[4] >> 1 & 0xF7);
           m_soh_instrument->SetValue(soh);
           ESP_LOGD(TAG, "IncomingFrameCan1 SOH: %d", soh);
@@ -1691,59 +1686,68 @@ void OvmsVehicleNissanLeaf::IncomingFrameCan1(CAN_frame_t* p_frame)
           {
             StandardMetrics.ms_v_bat_soh->SetValue(soh);
           }
-        }
+        //}
+        
       }
 
+      // This is the multiplex flag for d[2], 1 indicates the value in d[2] is capacity
+      // bars, 0 indicates that it is the charge bars.  Note that this is not just ZE0
+      // but other variants have been seen to use this same multiplexing.
+      uint8_t  mx_bars = (d[4] & 0x01);
 
-      // Either the remaining charge or the total capacity in GIDS depending
-      // on the value of mx_bars_ZE0
-      uint16_t nl_gids = ((uint16_t) d[0] << 2) | ((d[1] & 0xc0) >> 6);
+      // Charge / capacity bars are multiplexed by mx_bars and encoded
+      // differently on each variant:
+      //   ZE0 (200X-2012)  -> lower 4 bits of d[2], direct 0-12 bars
+      //   AZE0 (2013-2017) -> upper 4 bits of d[2], 0-15 mapped to 0-12 bars
+      //   ZE1 (2018+)      -> upper 4 bits of d[2], 0-15 mapped to 0-12 bars
+      uint8_t bars;
+      if (cfg_ze1 || m_AZE0_charger)
+        {
+        static const uint8_t map_15_to_12[] = {0, 1, 2, 3, 4, 4, 5, 6, 7, 8, 8, 9, 10, 11, 12, 12};
+        bars = map_15_to_12[(d[2] >> 4) & 0x0F];
+        }
+      else
+        {
+        bars = d[2] & 0x0F;
+        }
+
+      if (mx_bars) 
+        {
+        m_capacitybars->SetValue(bars);
+        }
+      else
+        {
+        m_remaining_chargebars->SetValue(bars);
+        }
+
+      
+
+
 
       // This indicates if the value in nl_gids is the remaining battery charge or the
       // total capacity.  If 1 then the values in the packet are the total capacity,
       // if 0 then the values in the packet are the remaining charge.
+      // Using the captures from Dala's git repository this never set to 1 on a 24kWh battery,
+      // but is set on larger capacity batteries. Confirmed for 40kWh but assumend from the
+      // comments below to also work for the 30kWh. Always 0 on 24kWh battery.
       uint8_t  mx_gids = (d[5] & 0x10) >> 4;
 
-      // This is the multiplex flag for d[2], 1 indicates the value in d[2] is capacity
-      // bars, 0 indicates that it is the charge bars
-      uint8_t  mx_bars_ZE0 = (d[4] & 0x01);
+      // Either the remaining charge or the total capacity in GIDS depending
+      // on the value of mx_bars
+      uint16_t nl_gids = ((uint16_t) d[0] << 2) | ((d[1] & 0xc0) >> 6);
       
-      int type = -1;
-
       // gids is invalid during startup
       if (nl_gids != 1023)
       {
-        // On LEAF ZE0 200X-2012, some values differ from AZE0
-        // On a ZE0 the lower 4 bits are used for charge / capacity bars
-        // On a AZE0 all 8 bits of d[2] is used for the charge / capacity bars
-        // On a ZE1 the higher 4 bits are used for the charger / capacity bars
-        // TODO: The below needs to be updated to reflect the changing algorithm
-        switch (mx_bars_ZE0) {
-         case 0x00:
-           {
-             if (m_battery_type->AsInt(0) == BATTERY_TYPE_1_24kWh) {
-               uint8_t chargebars = (d[2] & 0x0F);
-               m_remaining_chargebars->SetValue(chargebars);
-             }
-           }
-           break;
-          case 0x01:
-           {
-             uint8_t capbars = (d[2] & 0x0F);
-             m_capacitybars->SetValue(capbars);
-             type = BATTERY_TYPE_1_24kWh;  // TODO: This is an invalid assignment on a ZE1
-           }
-           break;
-        }
         switch (mx_gids)
           {
           case 0x00:
             {
-            // Current gids on 24 and 30kwh models
+            // Current gids
             m_gids->SetValue(nl_gids);
             m_battery_energy_available->SetValue(nl_gids * GEN_1_WH_PER_GID, WattHours);
 
-            // new car soc -- 100% when the battery is new, less when it's degraded
+            // new car soc is calculated from the current gids and the max gids from config
             uint16_t max_gids = MyConfig.GetParamValueInt("xnl", "maxGids", GEN_1_NEW_CAR_GIDS);
             float soc_new_car = (nl_gids * 100.0) / max_gids;
             m_soc_new_car->SetValue(soc_new_car);
@@ -1753,11 +1757,23 @@ void OvmsVehicleNissanLeaf::IncomingFrameCan1(CAN_frame_t* p_frame)
               {
               StandardMetrics.ms_v_bat_soc->SetValue(soc_new_car);
               }
+
+            if (m_ze0_charger)
+              {
+              uint16_t raw_fullcap = ((d[1] & 0x3F) << 4) | ((d[2] & 0xF0) >> 4);
+              uint16_t fullcap_wh = (raw_fullcap + 250) * 80;
+              m_battery_energy_capacity->SetValue(fullcap_wh, WattHours);
+              m_kWh_capacity_read = true;
+              }
+            
+            // The there is no such parameter as soc.newcar.capacity this appears to be old code
+            /* 
             // 2012 Leaf has no instrument soc, battery capacity and max gids will be set from config, because it is not available on CAN
             if (MyConfig.GetParamValueBool("xnl", "soc.newcar.capacity", false)) {
               m_battery_energy_capacity->SetValue(max_gids * GEN_1_WH_PER_GID, WattHours);
               m_kWh_capacity_read = true;
               }
+            */
             }
             break;
           case  0x01:
@@ -1765,7 +1781,6 @@ void OvmsVehicleNissanLeaf::IncomingFrameCan1(CAN_frame_t* p_frame)
             // Max gids, this mx value only occurs on 30kWh models and up
             m_max_gids->SetValue(nl_gids);
             m_battery_energy_capacity->SetValue(nl_gids * GEN_1_WH_PER_GID, WattHours);
-            type = BATTERY_TYPE_2_30kWh;
             m_kWh_capacity_read = true;
             }
             break;
@@ -1785,42 +1800,47 @@ void OvmsVehicleNissanLeaf::IncomingFrameCan1(CAN_frame_t* p_frame)
          *         |    |  full 100% 	      | range 80%  	|
          *   type  | QC | 6.6kW  200V  100V | 6.6kW  200V  100V |
          *  ------ | -- |  --    --    --   |  --    --    --   |
-         *   ZE0 1 |  0 |  NA    9     17   |  NA    10    18*	|
-         *  AZE0 2 |  0 |  5	   8     11   |  18*   21    24	  |
-         *   ZE1   |  0 |  5	   8     11   |  22    25    28	  | <-- From Dala's ZE1 DBC files
+         *   1     |  0 |  NA    9     17   |  NA    10    18*	|
+         *   2     |  0 |  5	   8     11   |  18*   21    24	  |
          *
          * Only type 1 and type 2 24kwh models from before 2016 will report a valid 'range 80%'.
          * Any type 2 24 or 30kwh models starting mid 2015 (USA/Jap) or 2016 (UK), will always
          * return 0x1fff, and therefore never enter this if with mx values 18, 21 or 24.
          * This is linked to Nissan removing the 'long life mode (80%)' from the car settings.
+         * ZE1 variants will return all vallues from 1 to 17.
          */
-        int cd = -1;
-        switch (mx)
+
+        if (m_battery_type->AsInt(BATTERY_TYPE_UNKNOWN) == BATTERY_TYPE_UNKNOWN)
+        {
+          if (cfg_ze1 || mx == 21 ) { m_battery_type->SetValue(BATTERY_TYPE_2); }
+          else if (mx == 9) { m_battery_type->SetValue(BATTERY_TYPE_1); }
+        }
+        else
+        {
+          int cd = -1;
+          switch (mx)
           {
           case  0: m_quick_charge->SetValue(val); break;
           case  5: cd = CHARGE_DURATION_FULL_L2;  break;
           case  8: cd = CHARGE_DURATION_FULL_L1;  break;
-          case  9: cd = CHARGE_DURATION_FULL_L1;  type = BATTERY_TYPE_1_24kWh; break;
-          case 10: cd = CHARGE_DURATION_RANGE_L1; type = BATTERY_TYPE_1_24kWh; break;
+          case  9: cd = CHARGE_DURATION_FULL_L1;  break;
+          case 10: cd = CHARGE_DURATION_RANGE_L1; break;
           case 11: cd = CHARGE_DURATION_FULL_L0;  break;
-          case 17: cd = CHARGE_DURATION_FULL_L0;  type = BATTERY_TYPE_1_24kWh; break;
+          case 17: cd = CHARGE_DURATION_FULL_L0;  break;
           case 18: // meaning of mx 18 differs by battery version
-            switch(m_battery_type->AsInt(BATTERY_TYPE_2_24kWh))
-              {
-              case BATTERY_TYPE_1_24kWh: cd = CHARGE_DURATION_RANGE_L0; break;
-              case BATTERY_TYPE_2_24kWh: cd = CHARGE_DURATION_RANGE_L2; break;
-              case BATTERY_TYPE_2_30kWh: break;  // Will never occur with val != 0x1fff
-              }
+            if (m_battery_type->AsInt(BATTERY_TYPE_UNKNOWN) == BATTERY_TYPE_1)
+            {
+              cd = CHARGE_DURATION_RANGE_L0;
+            }
+            else
+            {
+              cd = CHARGE_DURATION_RANGE_L2;
+            }
             break;
-          case 21: cd = CHARGE_DURATION_RANGE_L1; type = BATTERY_TYPE_2_24kWh; break;
-          case 24: cd = CHARGE_DURATION_RANGE_L0; type = BATTERY_TYPE_2_24kWh; break;
+          case 21: cd = CHARGE_DURATION_RANGE_L1; break;
+          case 24: cd = CHARGE_DURATION_RANGE_L0; break;
           }
-        if (cd != -1) m_charge_duration->SetElemValue(cd, val/2);
-        }
-      // If detected, save battery type
-      if (type != -1)
-        {
-        m_battery_type->SetValue(type);  //TODO: this flips between 0 and 2 when charging a ZE1 40kWh, need to investigate why
+          if (cd != -1) m_charge_duration->SetElemValue(cd, val/2);
         }
       }
       break;

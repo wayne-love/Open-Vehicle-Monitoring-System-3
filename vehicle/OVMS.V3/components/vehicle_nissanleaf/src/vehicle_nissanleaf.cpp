@@ -1935,7 +1935,7 @@ void OvmsVehicleNissanLeaf::IncomingFrameCan2(CAN_frame_t* p_frame)
     once we are confident that we've address all issues arrising
     from the removal.  For example the foot barke forms part of the
     logic to determine the state of the car.
-     
+
     case 0x180: // Filtered out by CAN RX filter on ZE1
       if (d[5] != 0xff)
         {

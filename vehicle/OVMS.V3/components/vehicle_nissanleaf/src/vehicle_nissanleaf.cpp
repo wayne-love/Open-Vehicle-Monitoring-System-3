@@ -1880,6 +1880,7 @@ void OvmsVehicleNissanLeaf::IncomingFrameCan2(CAN_frame_t* p_frame)
 
   switch (p_frame->MsgID)
     {
+    /* 
     case 0x180: // Filtered out by CAN RX filter on ZE1
       if (d[5] != 0xff)
         {
@@ -1892,6 +1893,7 @@ void OvmsVehicleNissanLeaf::IncomingFrameCan2(CAN_frame_t* p_frame)
         StandardMetrics.ms_v_env_footbrake->SetValue(d[6] / 1.39);
         }
       break;
+    */
     case 0x355:
      // The odometer value on the bus is always in units appropriate
      // for the car's intended market and is unaffected by the dash

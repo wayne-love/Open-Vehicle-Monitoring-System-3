@@ -1986,9 +1986,17 @@ void OvmsVehicleNissanLeaf::IncomingFrameCan2(CAN_frame_t* p_frame)
       }
       ESP_LOGV(TAG, "IncomingFrameCan2 Charge bars: %d, 3kW minutes: %d", m_remaining_chargebars->AsInt(), m_charge_minutes_3kW_remaining->AsInt());
       break;
+
+
+    // The original comment for this code is that it is "soh as percentage" and dates back to 2019, but
+    // a) the code does not work for ZE1 (it returns a invalid value)
+    // b) there are no 5b3 messages in the ZE0 or AZE0 captures from Dala's git repository
+    // Additional in the DBC files this is tagged as NV200 only.
+    // Maybe we need a NV200 specific config option.
+    /*
     case 0x5b3:
       {
-      // soh as percentage
+
       if (!cfg_ze1) // ZE1 gets SOH by polling group 61
         {
           uint8_t soh = d[1] >> 1;
@@ -2005,6 +2013,8 @@ void OvmsVehicleNissanLeaf::IncomingFrameCan2(CAN_frame_t* p_frame)
         }
       break;
       }
+    */
+
     case 0x5c5:
       // This is the parking brake (which is foot-operated on some models).
       StandardMetrics.ms_v_env_handbrake->SetValue(d[0] & 4);

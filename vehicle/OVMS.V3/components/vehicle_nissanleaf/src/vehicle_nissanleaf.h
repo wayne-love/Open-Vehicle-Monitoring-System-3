@@ -270,8 +270,6 @@ class OvmsVehicleNissanLeaf : public OvmsVehicle
     bool        m_climate_really_off = false;           // Needed for AZE0 to shown correct hvac status while charging
     bool        m_kWh_capacity_read = false;            // m_battery_energy_capacity Ah*V fallback inhibitor
 
-    Model m_model = MODEL_UNKNOWN;                      // Model of the vehicle
-
     OvmsPoller::poll_pid_t* obdii_polls;
 
   protected:

@@ -196,8 +196,8 @@ class OvmsVehicleNissanLeaf : public OvmsVehicle
     OvmsMetricInt *m_gids;
     OvmsMetricInt *m_max_gids;
     OvmsMetricFloat *m_hx;
-    OvmsMetricFloat *m_soc_new_car;
-    OvmsMetricFloat *m_soc_instrument;
+    OvmsMetricFloat *m_soc_new_car;                       // SOC based on fixed value from web config 
+    OvmsMetricFloat *m_soc_instrument;                    // SOC read from BMS
     OvmsMetricInt *m_range_instrument;
     OvmsMetricVector<int> *m_bms_thermistor;
     OvmsMetricVector<int> *m_bms_temp_int;
@@ -259,8 +259,8 @@ class OvmsVehicleNissanLeaf : public OvmsVehicle
 
     int         m_MITM = 0;
     double      m_trip_odo;                             // trip distance estimated from speed
-    uint32_t    m_trip_last_upd_time;                  // timestamp as of last trip counter update
-    float       m_trip_last_upd_speed;                 // speed as of last trip counter update
+    uint32_t    m_trip_last_upd_time;                   // timestamp as of last trip counter update
+    float       m_trip_last_upd_speed;                  // speed as of last trip counter update
     float       m_cum_energy_used_wh;                   // Cumulated energy (in wh) used within 1 second ticker interval
     float       m_cum_energy_recd_wh;                   // Cumulated energy (in wh) recovered  within 1 second ticker interval
     float       m_cum_energy_charge_wh;                 // Cumulated energy (in wh) charged within 10 second ticker interval

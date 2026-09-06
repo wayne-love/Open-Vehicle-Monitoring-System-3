@@ -1729,7 +1729,7 @@ void OvmsVehicleNissanLeaf::IncomingFrameCan1(CAN_frame_t* p_frame)
               StandardMetrics.ms_v_bat_soc->SetValue(soc_new_car);
               }
 
-            if (m_ze0_charger)
+            if (m_ZE0_charger)
               {
               uint16_t raw_fullcap = ((d[1] & 0x3F) << 4) | ((d[2] & 0xF0) >> 4);
               uint16_t fullcap_wh = (raw_fullcap + 250) * 80;
@@ -1813,6 +1813,7 @@ void OvmsVehicleNissanLeaf::IncomingFrameCan1(CAN_frame_t* p_frame)
           }
           if (cd != -1) m_charge_duration->SetElemValue(cd, val/2);
         }
+      }
       }
       break;
     case 0x5bf:

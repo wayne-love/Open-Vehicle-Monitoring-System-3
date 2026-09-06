@@ -1629,6 +1629,16 @@ void OvmsVehicleNissanLeaf::IncomingFrameCan1(CAN_frame_t* p_frame)
             }
           }
         }
+      
+      // From the original commit
+      /* This does not give a sensible capacity estimate for 30kWh battery,
+       * but leave it here for now until we either figure out what this
+       * really is or find a way to read capacity some other way.
+       */
+      // From Dala's DBC files this is related to Quick Charges capacityonly 
+      // eg the capacity available for a quick charge.  It is not the total 
+      // capacity of the battery. Hence the misleading values observed.
+      /*      
       switch(m_battery_type->AsInt(BATTERY_TYPE_2_24kWh))
         {
         case BATTERY_TYPE_1_24kWh:
@@ -1644,6 +1654,7 @@ void OvmsVehicleNissanLeaf::IncomingFrameCan1(CAN_frame_t* p_frame)
           // instead m_battery_energy_capacity is set from message 0x5bc
           break;
         }
+      */
       }
       break;
     case 0x5bc:

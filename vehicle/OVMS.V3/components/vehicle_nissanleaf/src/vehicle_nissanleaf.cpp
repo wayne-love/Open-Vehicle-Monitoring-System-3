@@ -173,8 +173,8 @@ OvmsVehicleNissanLeaf::OvmsVehicleNissanLeaf()
   BmsSetCellArrangementVoltage(96, 32);
   BmsSetCellArrangementTemperature(3, 1);
 
-  m_gids = MyMetrics.InitInt("xnl.v.b.gids", SM_STALE_HIGH, 0);
-  m_max_gids = MyMetrics.InitInt("xnl.v.b.max.gids", SM_STALE_HIGH, 0);
+  m_gids = MyMetrics.InitInt("xnl.v.b.gids", SM_STALE_HIGH, 0);   // Remaining energy in GIDS (1 GID = 80 Wh)
+  m_max_gids = MyMetrics.InitInt("xnl.v.b.max.gids", SM_STALE_HIGH, 0);  // Original (before degredation) maximum battery capacity in GIDS (1 GID = 80 Wh)
   m_hx = MyMetrics.InitFloat("xnl.v.b.hx", SM_STALE_HIGH, 0);
   m_soc_new_car = MyMetrics.InitFloat("xnl.v.b.soc.newcar", SM_STALE_HIGH, 0, Percentage);
   m_soc_instrument = MyMetrics.InitFloat("xnl.v.b.soc.instrument", SM_STALE_HIGH, 0, Percentage);
@@ -184,9 +184,9 @@ OvmsVehicleNissanLeaf::OvmsVehicleNissanLeaf()
   m_bms_balancing = MyMetrics.InitBitset<96>("xnl.bms.balancing", SM_STALE_HIGH, 0);
   m_soh_new_car = MyMetrics.InitFloat("xnl.v.b.soh.newcar", SM_STALE_HIGH, 0, Percentage);
   m_soh_instrument = MyMetrics.InitFloat("xnl.v.b.soh.instrument", SM_STALE_HIGH, 0, Percentage);
-  m_battery_energy_capacity = MyMetrics.InitFloat("xnl.v.b.e.capacity", SM_STALE_HIGH, 0, kWh);
-  m_battery_energy_available = MyMetrics.InitFloat("xnl.v.b.e.available", SM_STALE_HIGH, 0, kWh);
-  m_battery_type = MyMetrics.InitInt("xnl.v.b.type", SM_STALE_HIGH, 0); // auto-detect version and size by can traffic
+  m_battery_energy_capacity = MyMetrics.InitFloat("xnl.v.b.e.capacity", SM_STALE_HIGH, 0, kWh);  // Total battery energy capacity in kWh
+  m_battery_energy_available = MyMetrics.InitFloat("xnl.v.b.e.available", SM_STALE_HIGH, 0, kWh); // Available battery energy in kWh
+  m_battery_type = MyMetrics.InitInt("xnl.v.b.type", SM_STALE_HIGH, BATTERY_TYPE_UNKNOWN); // Auto-detect version by can traffic - TODO: this does not need to be a metric, it could be a global variable
   m_battery_heaterpresent = MyMetrics.InitBool("xnl.v.b.heaterpresent", SM_STALE_HIGH, false);
   m_battery_heatrequested = MyMetrics.InitBool("xnl.v.b.heatrequested", SM_STALE_HIGH, false);
   m_battery_heatergranted = MyMetrics.InitBool("xnl.v.b.heatergranted", SM_STALE_HIGH, false);
@@ -776,6 +776,8 @@ void OvmsVehicleNissanLeaf::PollReply_Battery(const uint8_t *reply_data, uint16_
   float ah = ah10000 / 10000.0;
   StandardMetrics.ms_v_bat_cac->SetValue(ah);
 
+
+  // NOTE: capacity is read from other places that 59e
   if (!m_kWh_capacity_read) {
     // Because older LEAF models seem not to transmit 0x59e, calculate based on Ah and pack voltage
     m_battery_energy_capacity->SetValue((ah*StandardMetrics.ms_v_bat_voltage->AsFloat())/1000.0);
